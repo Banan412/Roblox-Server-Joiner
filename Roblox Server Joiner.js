@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Roblox Server Joiner UI
 // @namespace    https://roblox.com/
-// @version      1.2
-// @description  Join Roblox servers using Game ID and Job ID with input persistence and random server hopping
+// @version      1.3
+// @description  Join Roblox servers using Game ID and Job ID with history tracking and persistence
 // @author       @banana_2137 (discord) , @Banan412 (github)
 // @match        https://*.roblox.com/*
 // @grant        none
@@ -193,6 +193,15 @@
                         return;
                     }
 
+                    // Retrieve history of previously joined servers
+                    let joinedHistory = [];
+                    try {
+                        joinedHistory = JSON.parse(localStorage.getItem('serverJoiner_history')) || [];
+                        if (!Array.isArray(joinedHistory)) joinedHistory = [];
+                    } catch (e) {
+                        joinedHistory = [];
+                    }
+
                     // Filter out full servers
                     const joinableServers = result.data.filter(srv => srv.playing < srv.maxPlayers);
 
@@ -202,11 +211,35 @@
                         return;
                     }
 
-                    // Select a random server from the list of non-full servers
-                    const randomServer = joinableServers[Math.floor(Math.random() * joinableServers.length)];
-                    status.textContent = `Joining random server: ${randomServer.id} (${randomServer.playing}/${randomServer.maxPlayers})...`;
-                    
-                    Roblox.GameLauncher.joinGameInstance(placeId, randomServer.id);
+                    // Filter out servers we already visited
+                    const unvisitedServers = joinableServers.filter(srv => !joinedHistory.includes(srv.id));
+
+                    let selectedServer;
+
+                    if (unvisitedServers.length > 0) {
+                        // Pick a random unvisited server
+                        selectedServer = unvisitedServers[Math.floor(Math.random() * unvisitedServers.length)];
+                    } else {
+                        // All available servers have been visited. Reset history for these servers and pick one at random.
+                        status.textContent = 'All available servers already visited. Resetting history...';
+                        selectedServer = joinableServers[Math.floor(Math.random() * joinableServers.length)];
+                        
+                        // Remove these server IDs from the persistent history
+                        joinedHistory = joinedHistory.filter(id => !joinableServers.some(srv => srv.id === id));
+                    }
+
+                    // Add current server to history (limit history size to last 50 entries)
+                    joinedHistory.push(selectedServer.id);
+                    if (joinedHistory.length > 50) {
+                        joinedHistory.shift();
+                    }
+
+                    try {
+                        localStorage.setItem('serverJoiner_history', JSON.stringify(joinedHistory));
+                    } catch (e) {}
+
+                    status.textContent = `Joining random server: ${selectedServer.id} (${selectedServer.playing}/${selectedServer.maxPlayers})...`;
+                    Roblox.GameLauncher.joinGameInstance(placeId, selectedServer.id);
                 }
             } catch (err) {
                 console.error(err);
