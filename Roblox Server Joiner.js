@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Roblox Server Joiner UI
 // @namespace    https://roblox.com/
-// @version      1.1
-// @description  Join Roblox servers using Game ID and Job ID
+// @version      1.2
+// @description  Join Roblox servers using Game ID and Job ID with input persistence and random server hopping
 // @author       @banana_2137 (discord) , @Banan412 (github)
 // @match        https://*.roblox.com/*
 // @grant        none
@@ -81,6 +81,30 @@
 
         document.body.appendChild(panel);
 
+        const placeIdInput = document.getElementById('placeIdInput');
+        const jobIdInput = document.getElementById('jobIdInput');
+
+        // Load saved values from localStorage
+        try {
+            placeIdInput.value = localStorage.getItem('serverJoiner_placeId') || '';
+            jobIdInput.value = localStorage.getItem('serverJoiner_jobId') || '';
+        } catch (e) {
+            console.error('Could not access localStorage:', e);
+        }
+
+        // Save inputs on type
+        placeIdInput.addEventListener('input', () => {
+            try {
+                localStorage.setItem('serverJoiner_placeId', placeIdInput.value.trim());
+            } catch (e) {}
+        });
+
+        jobIdInput.addEventListener('input', () => {
+            try {
+                localStorage.setItem('serverJoiner_jobId', jobIdInput.value.trim());
+            } catch (e) {}
+        });
+
         // Dragging
         const dragHandle = document.getElementById('dragHandle');
 
@@ -133,9 +157,9 @@
         });
 
         // Join button
-        document.getElementById('joinServerBtn').addEventListener('click', () => {
-            const placeId = document.getElementById('placeIdInput').value.trim();
-            const jobId = document.getElementById('jobIdInput').value.trim();
+        document.getElementById('joinServerBtn').addEventListener('click', async () => {
+            const placeId = placeIdInput.value.trim();
+            const jobId = jobIdInput.value.trim();
             const status = document.getElementById('joinStatus');
 
             if (!placeId) {
@@ -150,12 +174,39 @@
                     return;
                 }
 
-                status.textContent = 'Attempting to join...';
-
                 if (jobId) {
+                    status.textContent = 'Attempting to join specific server...';
                     Roblox.GameLauncher.joinGameInstance(placeId, jobId);
                 } else {
-                    Roblox.GameLauncher.joinMultiplayerGame(placeId);
+                    status.textContent = 'Finding a random public server...';
+                    
+                    // Fetch up to 100 public servers
+                    const response = await fetch(`https://games.roblox.com/v1/games/${placeId}/servers/Public?limit=100`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to contact servers API (Status: ${response.status})`);
+                    }
+                    
+                    const result = await response.json();
+                    if (!result.data || result.data.length === 0) {
+                        status.textContent = 'No active servers found. Joining standard matchmaking...';
+                        Roblox.GameLauncher.joinMultiplayerGame(placeId);
+                        return;
+                    }
+
+                    // Filter out full servers
+                    const joinableServers = result.data.filter(srv => srv.playing < srv.maxPlayers);
+
+                    if (joinableServers.length === 0) {
+                        status.textContent = 'All retrieved servers are full. Joining standard matchmaking...';
+                        Roblox.GameLauncher.joinMultiplayerGame(placeId);
+                        return;
+                    }
+
+                    // Select a random server from the list of non-full servers
+                    const randomServer = joinableServers[Math.floor(Math.random() * joinableServers.length)];
+                    status.textContent = `Joining random server: ${randomServer.id} (${randomServer.playing}/${randomServer.maxPlayers})...`;
+                    
+                    Roblox.GameLauncher.joinGameInstance(placeId, randomServer.id);
                 }
             } catch (err) {
                 console.error(err);
