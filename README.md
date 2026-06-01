@@ -25,6 +25,8 @@ This script injects a custom interface into Roblox pages and uses Roblox’s bui
 
 It enables fast access to specific servers directly from the browser.
 
+<img width="309" height="238" alt="image" src="https://github.com/user-attachments/assets/f2a4c6ce-1e78-4b21-b0f4-fbd7edfb96cb" />
+
 ---
 
 ## Installation
