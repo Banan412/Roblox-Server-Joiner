@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Roblox Server Joiner UI
 // @namespace    https://roblox.com/
-// @version      1.3
-// @description  Join Roblox servers using Game ID and Job ID with history tracking and persistence
+// @version      1.5
+// @description  Join Roblox servers using Game ID and Job ID (full or shortened/website format) with history tracking and persistence
 // @author       @banana_2137 (discord) , @Banan412 (github)
 // @match        https://*.roblox.com/*
 // @grant        none
@@ -175,17 +175,69 @@
                 }
 
                 if (jobId) {
+                    let targetJobId = jobId;
+
+                    // Standard UUID length is 32 alphanumeric characters.
+                    // If the cleaned input is shorter than 32, resolve it from the public server list.
+                    const normalizedInput = jobId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+                    if (normalizedInput.length === 0) {
+                        throw new Error('Please enter a valid Job ID.');
+                    }
+
+                    if (normalizedInput.length < 32) {
+                        status.textContent = 'Resolving shortened Job ID...';
+
+                        let nextPageCursor = '';
+                        let matchedServer = null;
+                        let pagesScanned = 0;
+
+                        // Scan up to 3 pages (up to 300 servers) to find the match
+                        while (!matchedServer && pagesScanned < 3) {
+                            const cursorParam = nextPageCursor ? `&cursor=${nextPageCursor}` : '';
+                            const response = await fetch(`https://games.roblox.com/v1/games/${placeId}/servers/Public?limit=100${cursorParam}`);
+                            
+                            if (!response.ok) {
+                                throw new Error(`Failed to contact servers API (Status: ${response.status})`);
+                            }
+
+                            const result = await response.json();
+                            if (!result.data || result.data.length === 0) {
+                                break;
+                            }
+
+                            // Clean both IDs of hyphens/punctuation for a reliable match
+                            matchedServer = result.data.find(srv => {
+                                const normalizedServerId = srv.id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                                return normalizedServerId.includes(normalizedInput);
+                            });
+
+                            if (matchedServer) break;
+
+                            nextPageCursor = result.nextPageCursor;
+                            if (!nextPageCursor) break;
+                            pagesScanned++;
+                        }
+
+                        if (!matchedServer) {
+                            throw new Error(`Could not find an active server matching "${jobId}".`);
+                        }
+
+                        targetJobId = matchedServer.id;
+                        status.textContent = `Resolved Job ID: ${targetJobId.substring(0, 8)}...`;
+                    }
+
                     status.textContent = 'Attempting to join specific server...';
-                    Roblox.GameLauncher.joinGameInstance(placeId, jobId);
+                    Roblox.GameLauncher.joinGameInstance(placeId, targetJobId);
                 } else {
                     status.textContent = 'Finding a random public server...';
-                    
+
                     // Fetch up to 100 public servers
                     const response = await fetch(`https://games.roblox.com/v1/games/${placeId}/servers/Public?limit=100`);
                     if (!response.ok) {
                         throw new Error(`Failed to contact servers API (Status: ${response.status})`);
                     }
-                    
+
                     const result = await response.json();
                     if (!result.data || result.data.length === 0) {
                         status.textContent = 'No active servers found. Joining standard matchmaking...';
@@ -223,7 +275,7 @@
                         // All available servers have been visited. Reset history for these servers and pick one at random.
                         status.textContent = 'All available servers already visited. Resetting history...';
                         selectedServer = joinableServers[Math.floor(Math.random() * joinableServers.length)];
-                        
+
                         // Remove these server IDs from the persistent history
                         joinedHistory = joinedHistory.filter(id => !joinableServers.some(srv => srv.id === id));
                     }
