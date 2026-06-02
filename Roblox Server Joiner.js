@@ -193,7 +193,7 @@
                         let pagesScanned = 0;
 
                         // Scan up to 3 pages (up to 300 servers) to find the match
-                        while (!matchedServer && pagesScanned < 3) {
+                        while (!matchedServer && pagesScanned < 50) {
                             const cursorParam = nextPageCursor ? `&cursor=${nextPageCursor}` : '';
                             const response = await fetch(`https://games.roblox.com/v1/games/${placeId}/servers/Public?limit=100${cursorParam}`);
                             
