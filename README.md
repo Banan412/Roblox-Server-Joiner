@@ -9,7 +9,7 @@ A simple and lightweight userscript for Roblox that adds a draggable server join
 - **Join by Game ID:** Connect to any game using only a Game ID (Place ID).
 - **Smart Random Hopping:** If the Job ID field is left blank, the script fetches the active public server list, filters out full servers, and connects you to a random server to avoid putting you back in the same server you just left.
 - **Server Visit History:** Tracks the last 50 servers you have joined. When random hopping, the script prioritizes unvisited servers. If you have visited all available non-full servers, the history resets automatically.
-- **Shortened Job ID Support:** Works with both full 36-character Job IDs and shortened formats (such as the split `ba7e-6afc` format used by BTRoblox/Website list IDs). It scans up to 1000 active servers to resolve and match the shortened ID.
+- **Shortened Job ID Support:** Works with both full 36-character Job IDs and shortened formats (such as the split `ba7e-6afc` format used by BTRoblox/Website list IDs). It scans up to 5000 active servers to resolve and match the shortened ID.
 - **Input Persistence:** Automatically saves your last entered Game ID and Job ID using `localStorage` so they are not cleared when you refresh the page.
 - **Draggable UI Window:** Position the UI panel anywhere on your screen.
 - **Minimize & Restore:** Collapse the panel to keep your screen clean, or close it entirely.
